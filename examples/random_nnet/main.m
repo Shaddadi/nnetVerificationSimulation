@@ -1,7 +1,7 @@
 % neural network verification based on simulation
 clear;
 clc;
-
+addpath('../../src')
 load network.mat
 network.W = W;
 network.b = b;
@@ -28,7 +28,7 @@ toc
 verifyCorrectness(S, p_randm, p_bef_relu, network)
 
 % verify using random samples
-fprintf('Printing domain and random samples...\n\n')
+fprintf('Printing domains and random samples...\n\n')
 figure
 subplot(1,2,1)
 title('Input domain')
