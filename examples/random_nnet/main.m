@@ -1,53 +1,57 @@
-% neural network verification based on simulation
+% % find the closest point to the unsafe domain 
+
 clear;
 clc;
-addpath('../../src')
-load network.mat
+addpath('../../src/ffnn')
+load NeuralNetwork7_3.mat
 network.W = W;
 network.b = b;
-% random input point 
-lb = [-1,;-1]; 
-ub = [1; 1];
-%p_randm = lb + rand(2,1).*(ub-lb);
-p_randm = [0.288636260387383;-0.242781234679463];
+network.layerNum = length(network.b);
 
-tic
-% compute the input domain
-[y, p_bef_relu] = networkOutputSingle(p_randm,network);
-S = nnetInputPointRange(p_bef_relu, network);
+lb = [-1; -1; -1];
+ub = [1; 1; 1];
+% restricted convex set by bounds
+inputDim = length(lb);
+S_r = [eye(inputDim),-ub; -eye(inputDim),lb];
 
-% compute nnet output domain
-A = S(:,1:end-1);
-b = S(:,end);
-polyh_input = Polyhedron('A',A,'b',-b);
-polyh_input = polyh_input.minHRep();
-polyh_output = computeNetOutput(polyh_input, p_bef_relu, network);
-toc
+% unsafe domain y1+48<=0
+S_unsafe.A = [-1, 0];
+S_unsafe.d = 13.11;
 
-% verify correctness of the proposed method 
-verifyCorrectness(S, p_randm, p_bef_relu, network)
-
-% verify using random samples
-fprintf('Printing domains and random samples...\n\n')
-figure
-subplot(1,2,1)
-title('Input domain')
-hold on
-plot(polyh_input)
-num = 5000; p_output = [];
-V = polyh_input.V';
-for n=1:num
-    r = rand(1, size(V,2));
-    r = r / sum(r);
-    p_temp = V*r';
-    plot(p_temp(1),p_temp(2),'b*')
-    y = networkOutputSingle(p_temp,network);
-    p_output = [p_output, y];
+% load input_p.mat;
+alpha = 1.0e-10;
+M = 4;
+for num = 1:100
+    dbest = 10000;
+    % random input point 
+    input_p = lb + rand(length(lb),1).*(ub-lb);
+    dom_init= extractActivatedDomainSingle(input_p, network);  
+    doms = {dom_init};
+    d_all = [];
+    while ~isempty(doms)
+        xbest = [];
+        for i = 1:length(doms)
+            domi = doms{i};
+            [x, d, counter] = testFFNetDom(domi, network, S_r, S_unsafe);
+            if counter == "counter"
+                fprintf("\nCounterexamples are found!\n\n")
+                return;
+            elseif counter == "invalid"
+                continue;
+            end
+            if ~any((d_all<=d+alpha)&(d_all>=d-alpha))
+                d_all(end+1) = d;
+                if d < dbest
+                    dbest = d;
+                    dombest = domi;
+                    xbest = x;
+                end
+            end
+        end
+        if isempty(xbest)
+            doms = {};
+        else
+            doms = nextFFnetTrack(xbest, dombest, network);
+        end
+    end
 end
-hold off
-subplot(1,2,2)
-title('Output Domain')
-hold on 
-plot(polyh_output)
-plot(p_output(1,:),p_output(2,:),'b*')
-hold off 

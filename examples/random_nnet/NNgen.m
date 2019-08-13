@@ -1,6 +1,6 @@
 clc;clear
 % random NN
-S = [2, 1000, 1000, 1000, 2];
+S = [3, 1000, 1000, 2];
 for i = 2:length(S)
     w_temp = randn(S(i), S(i-1));
     b_temp = randn(S(i),1);
